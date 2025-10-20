@@ -1,0 +1,21 @@
+# Data Processing
+pandas==2.1.4
+numpy==1.26.2
+
+# Data Validation
+great-expectations==0.18.8
+
+# Jupyter for exploration
+jupyter==1.0.0
+ipykernel==6.27.1
+
+# API requests
+requests==2.31.0
+
+# Utilities
+python-dotenv==1.0.0
+pyyaml==6.0.1
+
+# Testing
+pytest==7.4.3
+pytest-cov==4.1.0
