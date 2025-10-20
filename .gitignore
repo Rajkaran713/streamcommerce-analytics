@@ -1,0 +1,55 @@
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Data files (we'll add datasets later, don't commit large files)
+data/raw/*
+data/staging/*
+data/processed/*
+*.csv
+*.parquet
+*.json
+!.gitkeep
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+logs/*.log
+*.log
+
+# Environment variables
+.env
+.env.local
+
+# Docker
+docker-compose.override.yml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Kafka data
+kafka-data/
+zookeeper-data/
+
+# PostgreSQL data
+postgres-data/
