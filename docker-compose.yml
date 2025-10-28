@@ -1,7 +1,31 @@
 version: '3.8'
 
+x-airflow-common:
+  &airflow-common
+  image: apache/airflow:2.8.0-python3.11
+  environment:
+    &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://streamcommerce:streamcommerce123@postgres/airflow_db
+    AIRFLOW__CORE__FERNET_KEY: ''
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__WEBSERVER__SECRET_KEY: 'streamcommerce_secret_key_12345'
+    AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth'
+  volumes:
+    - ./airflow/dags:/opt/airflow/dags
+    - ./airflow/logs:/opt/airflow/logs
+    - ./airflow/plugins:/opt/airflow/plugins
+    - ./src:/opt/airflow/src
+    - ./data:/opt/airflow/data
+  user: "${AIRFLOW_UID:-50000}:0"
+  depends_on:
+    &airflow-common-depends-on
+    postgres:
+      condition: service_healthy
+
 services:
-  # PostgreSQL Database
+  # PostgreSQL Database (shared for both app and Airflow)
   postgres:
     image: postgres:15-alpine
     container_name: streamcommerce-postgres
@@ -15,6 +39,7 @@ services:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./init-airflow-db.sql:/docker-entrypoint-initdb.d/init-airflow-db.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U streamcommerce -d ecommerce_db"]
       interval: 10s
@@ -41,7 +66,7 @@ services:
     networks:
       - streamcommerce-network
 
-  # Zookeeper (required for Kafka)
+  # Zookeeper
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     container_name: streamcommerce-zookeeper
@@ -85,6 +110,66 @@ services:
       interval: 10s
       timeout: 10s
       retries: 5
+
+  # Airflow Webserver
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: streamcommerce-airflow-webserver
+    command: webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      <<: *airflow-common-depends-on
+    networks:
+      - streamcommerce-network
+
+  # Airflow Scheduler
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: streamcommerce-airflow-scheduler
+    command: scheduler
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8974/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      <<: *airflow-common-depends-on
+    networks:
+      - streamcommerce-network
+
+  # Airflow Init (runs once to setup DB)
+  airflow-init:
+    <<: *airflow-common
+    container_name: streamcommerce-airflow-init
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        mkdir -p /opt/airflow/logs /opt/airflow/dags /opt/airflow/plugins
+        airflow db migrate
+        airflow users create \
+          --username admin \
+          --password admin123 \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email admin@streamcommerce.com
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_DB_MIGRATE: 'true'
+      _AIRFLOW_WWW_USER_CREATE: 'true'
+    networks:
+      - streamcommerce-network
 
 volumes:
   postgres_data:
