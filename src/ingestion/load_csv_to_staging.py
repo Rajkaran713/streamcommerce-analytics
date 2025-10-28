@@ -170,7 +170,106 @@ class CSVLoader:
         
         self.db.execute_many(query, data)
         print(f"✅ Loaded {len(data):,} orders into staging_orders")
+    def load_order_items(self):
+        """Load order items CSV to staging"""
+        print("\n" + "="*80)
+        print("📦 Loading ORDER ITEMS data...")
+        print("="*80)
+        
+        df = pd.read_csv(self.data_path / 'olist_order_items_dataset.csv')
+        print(f"📊 Loaded {len(df):,} rows from CSV")
+        
+        # Convert dates
+        df['shipping_limit_date'] = pd.to_datetime(df['shipping_limit_date'], errors='coerce')
+        df = df.replace({pd.NaT: None, np.nan: None})
+        
+        data = []
+        for _, row in df.iterrows():
+            data.append((
+                row['order_id'],
+                int(row['order_item_id']),
+                row['product_id'],
+                row['seller_id'],
+                row['shipping_limit_date'],
+                float(row['price']),
+                float(row['freight_value'])
+            ))
+        
+        query = """
+            INSERT INTO staging_order_items 
+            (order_id, order_item_id, product_id, seller_id,
+             shipping_limit_date, price, freight_value)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """
+        
+        self.db.execute_many(query, data)
+        print(f"✅ Loaded {len(data):,} order items into staging_order_items")
     
+    def load_payments(self):
+        """Load payments CSV to staging"""
+        print("\n" + "="*80)
+        print("📦 Loading PAYMENTS data...")
+        print("="*80)
+        
+        df = pd.read_csv(self.data_path / 'olist_order_payments_dataset.csv')
+        print(f"📊 Loaded {len(df):,} rows from CSV")
+        
+        data = []
+        for _, row in df.iterrows():
+            data.append((
+                row['order_id'],
+                int(row['payment_sequential']),
+                row['payment_type'],
+                int(row['payment_installments']),
+                float(row['payment_value'])
+            ))
+        
+        query = """
+            INSERT INTO staging_payments 
+            (order_id, payment_sequential, payment_type,
+             payment_installments, payment_value)
+            VALUES (%s, %s, %s, %s, %s)
+        """
+        
+        self.db.execute_many(query, data)
+        print(f"✅ Loaded {len(data):,} payments into staging_payments")
+    
+    def load_reviews(self):
+        """Load reviews CSV to staging"""
+        print("\n" + "="*80)
+        print("📦 Loading REVIEWS data...")
+        print("="*80)
+        
+        df = pd.read_csv(self.data_path / 'olist_order_reviews_dataset.csv')
+        print(f"📊 Loaded {len(df):,} rows from CSV")
+        
+        # Convert dates
+        df['review_creation_date'] = pd.to_datetime(df['review_creation_date'], errors='coerce')
+        df['review_answer_timestamp'] = pd.to_datetime(df['review_answer_timestamp'], errors='coerce')
+        df = df.replace({pd.NaT: None, np.nan: None})
+        
+        data = []
+        for _, row in df.iterrows():
+            data.append((
+                row['review_id'],
+                row['order_id'],
+                int(row['review_score']),
+                row['review_comment_title'],
+                row['review_comment_message'],
+                row['review_creation_date'],
+                row['review_answer_timestamp']
+            ))
+        
+        query = """
+            INSERT INTO staging_reviews 
+            (review_id, order_id, review_score, review_comment_title,
+             review_comment_message, review_creation_date, review_answer_timestamp)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """
+        
+        self.db.execute_many(query, data)
+        print(f"✅ Loaded {len(data):,} reviews into staging_reviews")
+
     def run_all(self):
         """Run all data loads"""
         try:
@@ -184,6 +283,9 @@ class CSVLoader:
             self.load_products()
             self.load_sellers()
             self.load_orders()
+            self.load_order_items()
+            self.load_payments()
+            self.load_reviews()
             
             print("\n" + "🎉"*40)
             print("ETL PROCESS COMPLETED SUCCESSFULLY!")
