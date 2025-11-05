@@ -3,12 +3,18 @@ FROM apache/airflow:2.8.0-python3.11
 # Switch to root to install system dependencies
 USER root
 
-# Install system dependencies if needed
+# Install Java (required for PySpark) and other tools
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     gcc \
+    default-jdk \
+    procps \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# Set JAVA_HOME environment variable
+ENV JAVA_HOME=/usr/lib/jvm/default-java
+ENV PATH="${JAVA_HOME}/bin:${PATH}"
 
 # Switch back to airflow user
 USER airflow
@@ -16,7 +22,7 @@ USER airflow
 # Copy requirements file
 COPY requirements.txt /requirements.txt
 
-# Install Python packages required for DAGs
+# Install Python packages required for DAGs and streaming
 RUN pip install --no-cache-dir \
     kafka-python-ng==2.2.2 \
     psycopg2-binary==2.9.11 \
@@ -26,3 +32,6 @@ RUN pip install --no-cache-dir \
 
 # Set Python path
 ENV PYTHONPATH=/opt/airflow/src:$PYTHONPATH
+
+# Verify Java installation (for debugging)
+RUN java -version

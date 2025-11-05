@@ -13,8 +13,26 @@ class DatabaseConnection:
     """Manages PostgreSQL database connections"""
     
     def __init__(self):
-        self.host = os.getenv('POSTGRES_HOST', 'localhost')
-        self.port = os.getenv('POSTGRES_PORT', '5433')
+        # Try to detect if running inside Docker container
+        # If inside Docker, use internal service names
+        # If outside Docker (your Mac), use localhost
+        
+        # Check if we're in a container by looking for /.dockerenv
+        is_docker = os.path.exists('/.dockerenv')
+        
+        if is_docker:
+            # Running inside Docker - use internal service names
+            default_host = 'postgres'
+            default_port = '5432'
+            print("🐳 Detected Docker environment")
+        else:
+            # Running on host machine - use localhost
+            default_host = 'localhost'
+            default_port = '5433'
+            print("💻 Detected host environment")
+        
+        self.host = os.getenv('POSTGRES_HOST', default_host)
+        self.port = os.getenv('POSTGRES_PORT', default_port)
         self.database = os.getenv('POSTGRES_DB', 'ecommerce_db')
         self.user = os.getenv('POSTGRES_USER', 'streamcommerce')
         self.password = os.getenv('POSTGRES_PASSWORD', 'streamcommerce123')
@@ -24,6 +42,7 @@ class DatabaseConnection:
     def connect(self):
         """Establish database connection"""
         try:
+            print(f"🔍 Connecting to PostgreSQL at {self.host}:{self.port}...")
             self.conn = psycopg2.connect(
                 host=self.host,
                 port=self.port,
@@ -32,10 +51,11 @@ class DatabaseConnection:
                 password=self.password
             )
             self.cursor = self.conn.cursor()
-            print(f"✅ Connected to database: {self.database}")
+            print(f"✅ Connected to database: {self.database} @ {self.host}:{self.port}")
             return self.conn
         except Exception as e:
             print(f"❌ Database connection failed: {e}")
+            print(f"   Attempted connection to: {self.host}:{self.port}")
             raise
     
     def disconnect(self):

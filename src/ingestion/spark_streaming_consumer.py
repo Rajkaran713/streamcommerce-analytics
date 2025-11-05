@@ -20,7 +20,7 @@ class StreamingConsumer:
         
         self.spark.sparkContext.setLogLevel("WARN")
         
-        print("✅ Spark session created")
+        print("âœ… Spark session created")
         print(f"   Spark version: {self.spark.version}")
     
     def read_clickstream(self):
@@ -41,11 +41,11 @@ class StreamingConsumer:
             StructField("quantity", IntegerType(), True)
         ])
         
-        # Read from Kafka
+        # Read from Kafka (use kafka:9093 for Docker internal network)
         df = self.spark \
             .readStream \
             .format("kafka") \
-            .option("kafka.bootstrap.servers", "localhost:9092") \
+            .option("kafka.bootstrap.servers", "kafka:9093") \
             .option("subscribe", "clickstream_events") \
             .option("startingOffsets", "earliest") \
             .load()
@@ -105,7 +105,7 @@ class StreamingConsumer:
         """Run real-time clickstream analysis"""
         
         print("\n" + "="*80)
-        print("🔥 STARTING REAL-TIME STREAM PROCESSING")
+        print("ðŸ”¥ STARTING REAL-TIME STREAM PROCESSING")
         print("="*80)
         print(f"Duration: {duration_seconds} seconds")
         print("Reading from Kafka topic: clickstream_events")
@@ -134,33 +134,33 @@ class StreamingConsumer:
             # Stop query
             query.stop()
             
-            print("\n✅ Stream processing completed")
+            print("\nâœ… Stream processing completed")
             
         except KeyboardInterrupt:
-            print("\n⚠️  Interrupted by user")
+            print("\nâš ï¸  Interrupted by user")
         
         except Exception as e:
-            print(f"\n❌ Error: {e}")
+            print(f"\nâŒ Error: {e}")
             import traceback
             traceback.print_exc()
         
         finally:
             self.spark.stop()
-            print("✅ Spark session stopped")
+            print("âœ… Spark session stopped")
     
     def show_current_metrics(self):
         """Show current metrics from Kafka (batch mode for quick check)"""
         
         print("\n" + "="*80)
-        print("📊 CURRENT KAFKA METRICS (Batch Mode)")
+        print("ðŸ“Š CURRENT KAFKA METRICS (Batch Mode)")
         print("="*80)
         
         try:
-            # Read all available data from Kafka
+            # Read all available data from Kafka (use kafka:9093 for Docker)
             df = self.spark \
                 .read \
                 .format("kafka") \
-                .option("kafka.bootstrap.servers", "localhost:9092") \
+                .option("kafka.bootstrap.servers", "kafka:9093") \
                 .option("subscribe", "clickstream_events") \
                 .option("startingOffsets", "earliest") \
                 .option("endingOffsets", "latest") \
@@ -189,39 +189,39 @@ class StreamingConsumer:
             total_events = parsed.count()
             
             if total_events == 0:
-                print("⚠️  No events found in Kafka")
+                print("âš ï¸  No events found in Kafka")
                 return
             
-            print(f"\n📈 Total Events in Kafka: {total_events:,}")
+            print(f"\nðŸ“ˆ Total Events in Kafka: {total_events:,}")
             
             # Event type breakdown
-            print("\n📊 Event Type Breakdown:")
+            print("\nðŸ“Š Event Type Breakdown:")
             parsed.groupBy("event_type") \
                 .count() \
                 .orderBy(desc("count")) \
                 .show()
             
             # Device breakdown
-            print("📱 Device Breakdown:")
+            print("ðŸ“± Device Breakdown:")
             parsed.groupBy("device") \
                 .count() \
                 .orderBy(desc("count")) \
                 .show()
             
             # Top referrers
-            print("🔗 Top Referrers:")
+            print("ðŸ”— Top Referrers:")
             parsed.groupBy("referrer") \
                 .count() \
                 .orderBy(desc("count")) \
                 .show()
             
             # Sample events
-            print("📋 Sample Events:")
+            print("ðŸ“‹ Sample Events:")
             parsed.select("event_type", "device", "referrer", "timestamp") \
                 .show(10, truncate=False)
             
         except Exception as e:
-            print(f"❌ Error reading from Kafka: {e}")
+            print(f"âŒ Error reading from Kafka: {e}")
         
         finally:
             self.spark.stop()

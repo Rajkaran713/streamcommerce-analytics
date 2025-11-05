@@ -8,19 +8,50 @@ from datetime import datetime
 from kafka import KafkaProducer
 import sys
 from pathlib import Path
-sys.path.append(str(Path(__file__).parent.parent))
 
-from utils.db_connection import DatabaseConnection
+# Import database connection from utils
+sys.path.insert(0, '/opt/airflow')
+from src.utils.db_connection import DatabaseConnection
 
 class ClickstreamGenerator:
     """Generates realistic clickstream events"""
     
     def __init__(self):
-        # Kafka producer
-        self.producer = KafkaProducer(
-            bootstrap_servers=['localhost:9092'],
-            value_serializer=lambda v: json.dumps(v).encode('utf-8')
-        )
+        # Kafka producer - try internal Docker network first, then localhost
+        bootstrap_servers = None
+        
+        # Try kafka:9093 (internal Docker network)
+        try:
+            print("🔍 Attempting connection to kafka:9093 (Docker internal)...")
+            self.producer = KafkaProducer(
+                bootstrap_servers=['kafka:9093'],
+                value_serializer=lambda v: json.dumps(v).encode('utf-8'),
+                request_timeout_ms=10000,
+                max_block_ms=10000
+            )
+            bootstrap_servers = 'kafka:9093'
+            print("✅ Connected to kafka:9093")
+        except Exception as e:
+            print(f"⚠️  Failed to connect to kafka:9093: {e}")
+            print("🔍 Attempting connection to localhost:9092...")
+            try:
+                self.producer = KafkaProducer(
+                    bootstrap_servers=['localhost:9092'],
+                    value_serializer=lambda v: json.dumps(v).encode('utf-8'),
+                    request_timeout_ms=10000,
+                    max_block_ms=10000
+                )
+                bootstrap_servers = 'localhost:9092'
+                print("✅ Connected to localhost:9092")
+            except Exception as e2:
+                print(f"❌ Failed to connect to Kafka: {e2}")
+                print("\n📋 Troubleshooting:")
+                print("  1. Check if Kafka is running: docker-compose ps kafka")
+                print("  2. Check Kafka logs: docker-compose logs kafka")
+                print("  3. Restart Kafka: docker-compose restart kafka")
+                raise
+        
+        print(f"📡 Using Kafka at: {bootstrap_servers}")
         
         # Load real product IDs from database
         self.product_ids = self.load_product_ids()
@@ -33,9 +64,9 @@ class ClickstreamGenerator:
             'purchase': 0.10    # 10% purchases
         }
         
-        print(f"✅ Clickstream Generator initialized")
-        print(f"   📦 Loaded {len(self.product_ids)} products")
-        print(f"   👤 Loaded {len(self.customer_ids)} customers")
+        print(f"âœ… Clickstream Generator initialized")
+        print(f"   ðŸ“¦ Loaded {len(self.product_ids)} products")
+        print(f"   ðŸ‘¤ Loaded {len(self.customer_ids)} customers")
     
     def load_product_ids(self):
         """Load real product IDs from database"""
@@ -82,7 +113,7 @@ class ClickstreamGenerator:
     
     def start(self, events_per_second=10, duration_seconds=60):
         """Start generating events"""
-        print(f"\n🚀 Starting clickstream generation...")
+        print(f"\nðŸš€ Starting clickstream generation...")
         print(f"   Rate: {events_per_second} events/second")
         print(f"   Duration: {duration_seconds} seconds")
         print(f"   Total events: ~{events_per_second * duration_seconds}")
@@ -104,12 +135,12 @@ class ClickstreamGenerator:
                     if event_count % 100 == 0:
                         elapsed = time.time() - start_time
                         rate = event_count / elapsed
-                        print(f"   📊 {event_count:,} events sent | {rate:.1f} events/sec | Type: {event['event_type']}")
+                        print(f"   ðŸ“Š {event_count:,} events sent | {rate:.1f} events/sec | Type: {event['event_type']}")
                 
                 time.sleep(1)  # Wait 1 second before next batch
         
         except KeyboardInterrupt:
-            print("\n⚠️  Interrupted by user")
+            print("\nâš ï¸  Interrupted by user")
         
         finally:
             # Flush and close
@@ -119,7 +150,7 @@ class ClickstreamGenerator:
             elapsed = time.time() - start_time
             avg_rate = event_count / elapsed if elapsed > 0 else 0
             
-            print(f"\n✅ Generation complete!")
+            print(f"\nâœ… Generation complete!")
             print(f"   Total events: {event_count:,}")
             print(f"   Duration: {elapsed:.1f} seconds")
             print(f"   Average rate: {avg_rate:.1f} events/second")
